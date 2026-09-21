@@ -7,11 +7,11 @@ import test from 'node:test';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 
-import { PostmanCollectionGeneratorStack } from '../lib/postman-collection-generator-stack';
+import { AwsApiCollectionsFactoryStack } from '../lib/aws-api-collections-factory-stack';
 
 test('uses the Cognito managed sign-in domain', () => {
   const app = new cdk.App();
-  const stack = new PostmanCollectionGeneratorStack(app, 'TestStack', {
+  const stack = new AwsApiCollectionsFactoryStack(app, 'TestStack', {
     env: { account: '111122223333', region: 'us-east-1' },
     repositoryRoot: resolve(__dirname, '../../../..'),
     domainName: 'pcg.example.com',

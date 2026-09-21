@@ -24,7 +24,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     strict: true,
     options: {
       'state-dir': { type: 'string' },
-      stack: { type: 'string', default: 'PostmanCollectionGenerator' },
+      stack: { type: 'string', default: 'AwsApiCollectionsFactory' },
     },
   });
   if (!parsed.values['state-dir']) throw new Error('--state-dir is required.');

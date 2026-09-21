@@ -1,5 +1,5 @@
 {
-  "name": "postman-collection-generator",
+  "name": "aws-api-collections-factory",
   "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",
@@ -8,6 +8,8 @@
     "build:backend": "npm run build --prefix backend",
     "build:web": "npm run build --prefix webapp",
     "build:aws": "npm run build --prefix deploy/aws",
+    "clean": "rm -rf build .gradle bin webui/static output reports coverage backend/dist webapp/*.tsbuildinfo deploy/aws/dist deploy/aws/cdk.out",
+    "clean:modules": "rm -rf backend/node_modules webapp/node_modules deploy/aws/node_modules scripts/node_modules",
     "cli": "npm run cli --prefix backend --",
     "serve": "npm run serve --prefix backend --",
     "test": "npm test --prefix backend",

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Postman Collection Generator depends on third-party software. Each dependency remains subject to
+AWS API Collections Factory depends on third-party software. Each dependency remains subject to
 its own license. The project does not modify or replace those license terms.
 
 ## Distributed Browser Dependencies

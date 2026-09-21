@@ -96,7 +96,7 @@ function constantTimeEqual(left: string, right: string): boolean {
 }
 
 function assertCloudFrontOrigin(event: APIGatewayProxyEventV2): void {
-  const supplied = event.headers['x-pcg-origin'] || '';
+  const supplied = event.headers['x-aacf-origin'] || '';
   if (!constantTimeEqual(supplied, originHeaderValue)) {
     throw new HttpError(403, 'This API is available through the application distribution only.');
   }

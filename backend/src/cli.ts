@@ -26,7 +26,7 @@ import {
 import type { JsonMap, RepositoryOptions } from './types.js';
 import { ApplicationError, consoleLogger, stderrLogger } from './types.js';
 
-const HELP = `postman-collection-generator
+const HELP = `aws-api-collections-factory
 
 Usage:
   apisync [repository options] check [--json]

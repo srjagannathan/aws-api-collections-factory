@@ -1,4 +1,4 @@
-# Postman Collection Generator
+# AWS API Collections Factory: Postman
 
 Generate protocol-correct Postman Collections from the official AWS Smithy API models. The
 application discovers AWS services, tracks selected services, converts their models, previews
@@ -30,38 +30,98 @@ The browser never receives the Postman API key.
 
 Python and containers are not required.
 
-## Install
+## Installation instructions
+Clone -> Clean -> Configure -> Install -> Build -> Initialize -> Use
+
+### 1. CLONE this repository
+This application provides CLI and Web interfaces. The web interface can be run locally or deployed to an AWS Account.
+
+  ```bash
+  git clone https://github.com/aws-api-collections-factory.git
+  ```
+
+### 2. CLEAN the local environment
+If re-installing the application, it is recommended to clean the local environment first.
+
+To remove all generated files and reset the local environment, run:
+  ```bash
+  cd aws-api-collections-factory
+  npm run clean
+  ```
+  To completely remove local modules, run:
+  ```bash
+  npm run clean:modules
+  ```
+
+### 3. CONFIGURE the local application data directory
+When used locally, the application clones the official AWS model repository if no existing checkout is specified. The local application uses the operating system's standard application-data directory:
+
+| Platform | Default location |
+|---|---|
+| macOS | `~/Library/Application Support/aws-api-collections-factory` |
+| Linux | `${XDG_CONFIG_HOME:-~/.config}/aws-api-collections-factory` |
+| Windows | `%APPDATA%\aws-api-collections-factory` |To change the default location, set the following environment variables:
+
+To use a different location for application state, set `APISYNC_HOME` to another directory.
+  ```bash
+  export APISYNC_HOME=/path/to/local-state
+  ```
+#### Advanced configurations
+The Smithy models required for this application are hosted on the official [AWS API Models](https://github.com/aws/api-models-aws.git) repository. To use a customized model source, set the `APISYNC_MODELS_REPO` environment variable before running the application:
+
+  ```bash
+  export APISYNC_MODELS_REPO=/path/to/api-models-aws
+  ```
+Once set, the application will use this fork instead of the official repository. Custom forks must have the same structure as the official repository, but can be limited to specific services or operations only.
+
+The api-models-aws repo (or the custom fork specified by `APISYNC_MODELS_REPO`) will be cloned under the application-data directory.
+
+### 4. INSTALL application components
+
+#### STEP 1: Install the backend
+  ```bash
+  npm ci --prefix backend
+  ```
+
+#### STEP 2: Install the conversion script
+  ```bash
+  npm ci --prefix scripts
+  ```
+
+#### STEP 3: Install the webapp
+
+##### Local Installation
+The web application can be installed locally using the following command:
+  ```bash
+  npm ci --prefix webapp
+  ```
+
+##### Hosted Installation
+The web app, application state, and backend can be installed for a hosted AWS deployment using the following command:
+  ```bash
+  npm ci --prefix deploy/aws
+  ```
+#### STEP 4: INSTALL the core Smithy to OpenAPI convertor
 
 ```bash
-npm ci --prefix backend
-npm ci --prefix scripts
-npm ci --prefix webapp
-npm ci --prefix deploy/aws
 ./gradlew installDist
+```
+
+#### STEP 5: BUILD the app
+```bash
 npm run build
 ```
 
-Initialize neutral local configuration:
+#### STEP 6: INITIALIZE application data
+Local application data is maintained in the config/services.json and config/postman.json files. Initializing the application will create these files if they do not already exist.
 
 ```bash
 npm run cli -- init
 ```
 
-The application uses the operating system's standard application-data directory:
-
-| Platform | Default location |
-|---|---|
-| macOS | `~/Library/Application Support/postman-collection-generator` |
-| Linux | `${XDG_CONFIG_HOME:-~/.config}/postman-collection-generator` |
-| Windows | `%APPDATA%\postman-collection-generator` |
-
-Set `APISYNC_HOME` to use another directory. Configuration examples under `config/` contain no
-workspace identifier, credential, account identifier, personal path, or required fork.
-
 ## AWS Models
 
-The application can manage its own clone of the official AWS model repository. When
-`--models-dir` and `APISYNC_MODELS_REPO` are both absent, the first model operation clones:
+The application can manage its own clone of the official AWS model repository. When `--models-dir` and `APISYNC_MODELS_REPO` are both absent, the first model operation clones:
 
 ```text
 https://github.com/aws/api-models-aws.git
@@ -180,15 +240,15 @@ The deployment must run in `us-east-1` because the CloudFront certificate and we
 list are regional deployment inputs. Set account-specific values outside the repository:
 
 ```bash
-export PCG_ACCOUNT_ID=123456789012
+export AACF_ACCOUNT_ID=123456789012
 export CDK_DEFAULT_REGION=us-east-1
-export PCG_DOMAIN_NAME=collections.example.com
-export PCG_HOSTED_ZONE_ID=Z00000000000000000000
-export PCG_HOSTED_ZONE_NAME=example.com
-export PCG_CERTIFICATE_ARN=arn:aws:acm:us-east-1:123456789012:certificate/example
+export AACF_DOMAIN_NAME=collections.example.com
+export AACF_HOSTED_ZONE_ID=Z00000000000000000000
+export AACF_HOSTED_ZONE_NAME=example.com
+export AACF_CERTIFICATE_ARN=arn:aws:acm:us-east-1:123456789012:certificate/example
 
 npm run build
-npm run cdk --prefix deploy/aws -- bootstrap "aws://${PCG_ACCOUNT_ID}/${CDK_DEFAULT_REGION}"
+npm run cdk --prefix deploy/aws -- bootstrap "aws://${AACF_ACCOUNT_ID}/${CDK_DEFAULT_REGION}"
 npm run cdk --prefix deploy/aws -- deploy --require-approval never
 ```
 
@@ -207,7 +267,7 @@ environment exports, credentials, or historical reports.
 Create the administrator after deployment:
 
 ```bash
-export PCG_ADMIN_EMAIL=administrator@example.com
+export AACF_ADMIN_EMAIL=administrator@example.com
 npm run create-admin --prefix deploy/aws
 ```
 
@@ -268,8 +328,8 @@ npm audit --prefix webapp
 npm audit --prefix deploy/aws
 ```
 
-AWS deployment tests require the `PCG_DOMAIN_NAME`, `PCG_HOSTED_ZONE_ID`,
-`PCG_HOSTED_ZONE_NAME`, and `PCG_CERTIFICATE_ARN` inputs documented above. Continuous integration
+AWS deployment tests require the `AACF_DOMAIN_NAME`, `AACF_HOSTED_ZONE_ID`,
+`AACF_HOSTED_ZONE_NAME`, and `AACF_CERTIFICATE_ARN` inputs documented above. Continuous integration
 uses neutral test values and synthesizes the complete stack.
 
 The Node test suite verifies optional mirror behavior and the complete SNS `ListTopics` conversion

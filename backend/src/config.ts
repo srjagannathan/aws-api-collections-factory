@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { RepositoryOptions, RuntimePaths } from './types.js';
 
-export const APPLICATION_NAME = 'postman-collection-generator';
+export const APPLICATION_NAME = 'aws-api-collections-factory';
 export const DEFAULT_MODELS_URL = 'https://github.com/aws/api-models-aws.git';
 
 export function resolveInputPath(value: string, env: NodeJS.ProcessEnv = process.env): string {
@@ -22,7 +22,7 @@ function findRepositoryRoot(): string {
     }
     const parent = dirname(candidate);
     if (parent === candidate) {
-      throw new Error('Unable to locate the postman-collection-generator repository root.');
+      throw new Error('Unable to locate the aws-api-collections-factory repository root.');
     }
     candidate = parent;
   }

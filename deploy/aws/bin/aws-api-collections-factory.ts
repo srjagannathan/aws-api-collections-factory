@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 import * as cdk from 'aws-cdk-lib';
 
-import { PostmanCollectionGeneratorStack } from '../lib/postman-collection-generator-stack';
+import { AwsApiCollectionsFactoryStack } from '../lib/aws-api-collections-factory-stack';
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name];
@@ -14,14 +14,14 @@ function requiredEnvironment(name: string): string {
 }
 
 const app = new cdk.App();
-new PostmanCollectionGeneratorStack(app, process.env.PCG_STACK_NAME || 'PostmanCollectionGenerator', {
+new AwsApiCollectionsFactoryStack(app, process.env.AACF_STACK_NAME || 'AwsApiCollectionsFactory', {
   env: {
-    account: process.env.PCG_ACCOUNT_ID || process.env.CDK_DEFAULT_ACCOUNT,
+    account: process.env.AACF_ACCOUNT_ID || process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION || 'us-east-1',
   },
   repositoryRoot: resolve(__dirname, '../../..'),
-  domainName: requiredEnvironment('PCG_DOMAIN_NAME'),
-  hostedZoneId: requiredEnvironment('PCG_HOSTED_ZONE_ID'),
-  hostedZoneName: requiredEnvironment('PCG_HOSTED_ZONE_NAME'),
-  certificateArn: requiredEnvironment('PCG_CERTIFICATE_ARN'),
+  domainName: requiredEnvironment('AACF_DOMAIN_NAME'),
+  hostedZoneId: requiredEnvironment('AACF_HOSTED_ZONE_ID'),
+  hostedZoneName: requiredEnvironment('AACF_HOSTED_ZONE_NAME'),
+  certificateArn: requiredEnvironment('AACF_CERTIFICATE_ARN'),
 });

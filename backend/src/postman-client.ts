@@ -46,7 +46,7 @@ export class PostmanClient {
             'X-Api-Key': this.apiKey,
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            'User-Agent': 'postman-collection-generator/1.0',
+            'User-Agent': 'aws-api-collections-factory/1.0',
           },
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: AbortSignal.timeout(120_000),

@@ -1,5 +1,5 @@
 {
-  "name": "@sjesdemos/postman-collection-generator-aws",
+  "name": "@sjesdemos/aws-api-collections-factory-aws",
   "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
     "create-admin": "ts-node scripts/create-admin.ts",
     "seed": "ts-node scripts/seed-state.ts",
     "synth": "cdk synth",
-    "test": "npm run build && node --test dist/test/postman-collection-generator-stack.test.js && cdk synth --quiet"
+    "test": "npm run build && node --test dist/test/aws-api-collections-factory-stack.test.js && cdk synth --quiet"
   },
   "engines": {
     "node": ">=24"

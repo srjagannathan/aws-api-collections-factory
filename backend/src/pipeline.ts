@@ -351,7 +351,7 @@ export async function refreshPipeline(
   const inventoryPath = join(paths.applicationHome, 'ops-inventory.json');
   const postmanMap = await readJson<JsonMap>(mapPath, {});
   const operationsInventory = await readJson<JsonMap>(inventoryPath, {});
-  const staging = await mkdtemp(join(tmpdir(), 'postman-collection-generator-'));
+  const staging = await mkdtemp(join(tmpdir(), 'aws-api-collections-factory-'));
   const stagingOpenApi = join(staging, 'openapi');
   const stagingPostman = join(staging, 'postman');
   await mkdir(stagingOpenApi, { recursive: true });

@@ -8,7 +8,7 @@ support window in their release notes.
 ## Reporting a Vulnerability
 
 Use GitHub private vulnerability reporting for
-`SJESDemos/postman-collection-generator`. Do not open a public issue for credentials, arbitrary
+`SJESDemos/aws-api-collections-factory`. Do not open a public issue for credentials, arbitrary
 code execution, path traversal, request forgery, authentication bypass, or other exploitable
 behavior.
 

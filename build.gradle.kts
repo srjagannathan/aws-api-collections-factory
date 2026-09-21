@@ -20,7 +20,6 @@ dependencies {
     implementation("software.amazon.smithy:smithy-model:1.72.1")
     implementation("software.amazon.smithy:smithy-openapi:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-traits:1.72.1")
-    implementation("software.amazon.smithy:smithy-aws-apigateway-openapi:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-iam-traits:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-cloudformation-traits:1.72.1")
     implementation("software.amazon.smithy:smithy-rules-engine:1.72.1")

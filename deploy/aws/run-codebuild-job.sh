@@ -9,7 +9,7 @@ set -uo pipefail
 : "${STATE_BUCKET:?STATE_BUCKET is required}"
 
 job_log="${APISYNC_HOME}/job-${APISYNC_JOB_ID}.log"
-result_json="/tmp/postman-collection-generator-${APISYNC_JOB_ID}-result.json"
+result_json="/tmp/aws-api-collections-factory-${APISYNC_JOB_ID}-result.json"
 mkdir -p "${APISYNC_HOME}"
 
 case "${APISYNC_JOB_KIND}" in

@@ -55,10 +55,10 @@ jobs:
       - name: Test AWS deployment
         run: npm test --prefix deploy/aws
         env:
-          PCG_DOMAIN_NAME: pcg.example.com
-          PCG_HOSTED_ZONE_ID: Z0123456789EXAMPLE
-          PCG_HOSTED_ZONE_NAME: example.com
-          PCG_CERTIFICATE_ARN: arn:aws:acm:us-east-1:111122223333:certificate/example
+          AACF_DOMAIN_NAME: pcg.example.com
+          AACF_HOSTED_ZONE_ID: Z0123456789EXAMPLE
+          AACF_HOSTED_ZONE_NAME: example.com
+          AACF_CERTIFICATE_ARN: arn:aws:acm:us-east-1:111122223333:certificate/example
 
       - name: Build Java converter
         run: ./gradlew test installDist

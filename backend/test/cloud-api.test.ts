@@ -23,7 +23,7 @@ test('claimGroups rejects absent and unsupported claim values', () => {
 });
 
 test('normalizeBuildId accepts CodeBuild API identifiers and EventBridge ARNs', () => {
-  const id = 'postman-collection-generator-jobs:00000000-0000-0000-0000-000000000000';
+  const id = 'aws-api-collections-factory-jobs:00000000-0000-0000-0000-000000000000';
   assert.equal(normalizeBuildId(id), id);
   assert.equal(
     normalizeBuildId(`arn:aws:codebuild:us-east-1:123456789012:build/${id}`),

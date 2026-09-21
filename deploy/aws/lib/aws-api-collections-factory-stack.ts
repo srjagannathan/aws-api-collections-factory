@@ -27,7 +27,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import { Construct } from 'constructs';
 
-export interface PostmanCollectionGeneratorStackProps extends cdk.StackProps {
+export interface AwsApiCollectionsFactoryStackProps extends cdk.StackProps {
   repositoryRoot: string;
   domainName: string;
   hostedZoneId: string;
@@ -35,11 +35,11 @@ export interface PostmanCollectionGeneratorStackProps extends cdk.StackProps {
   certificateArn: string;
 }
 
-export class PostmanCollectionGeneratorStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: PostmanCollectionGeneratorStackProps) {
+export class AwsApiCollectionsFactoryStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: AwsApiCollectionsFactoryStackProps) {
     super(scope, id, props);
 
-    const applicationName = 'postman-collection-generator';
+    const applicationName = 'aws-api-collections-factory';
     const administratorGroup = 'Administrators';
     const applicationUrl = `https://${props.domainName}/`;
 
@@ -128,7 +128,7 @@ export class PostmanCollectionGeneratorStack extends cdk.Stack {
         logoutUrls: [applicationUrl],
       },
     });
-    const domainPrefix = `pcg-${cdk.Aws.ACCOUNT_ID}`;
+    const domainPrefix = `aacf-${cdk.Aws.ACCOUNT_ID}`;
     const userPoolDomain = userPool.addDomain('HostedUiDomain', {
       cognitoDomain: { domainPrefix },
     });
@@ -317,7 +317,7 @@ export class PostmanCollectionGeneratorStack extends cdk.Stack {
       defaultAction: { allow: {} },
       visibilityConfig: {
         cloudWatchMetricsEnabled: true,
-        metricName: 'PostmanCollectionGeneratorWebAcl',
+        metricName: 'AwsApiCollectionsFactoryWebAcl',
         sampledRequestsEnabled: true,
       },
       rules: [
@@ -412,11 +412,11 @@ export class PostmanCollectionGeneratorStack extends cdk.Stack {
       `${httpApi.apiId}.execute-api.${this.region}.${cdk.Aws.URL_SUFFIX}`,
       {
         protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
-        customHeaders: { 'X-PCG-Origin': originHeaderValue },
+        customHeaders: { 'X-AACF-Origin': originHeaderValue },
       },
     );
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      comment: 'Postman Collection Generator',
+      comment: 'AWS API Collections Factory',
       defaultRootObject: 'index.html',
       domainNames: [props.domainName],
       certificate,

@@ -22,11 +22,11 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     strict: true,
     options: {
       email: { type: 'string' },
-      stack: { type: 'string', default: 'PostmanCollectionGenerator' },
+      stack: { type: 'string', default: 'AwsApiCollectionsFactory' },
     },
   });
-  const email = parsed.values.email || process.env.PCG_ADMIN_EMAIL;
-  if (!email) throw new Error('--email or PCG_ADMIN_EMAIL is required.');
+  const email = parsed.values.email || process.env.AACF_ADMIN_EMAIL;
+  if (!email) throw new Error('--email or AACF_ADMIN_EMAIL is required.');
   const outputs = await stackOutputs(parsed.values.stack!);
   const userPoolId = requiredOutput(outputs, 'UserPoolId');
   const groupName = requiredOutput(outputs, 'AdministratorGroupName');

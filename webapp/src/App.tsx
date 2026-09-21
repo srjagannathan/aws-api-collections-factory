@@ -757,7 +757,7 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
   if (window.location.protocol === 'file:') {
     return (
       <main className="direct-open">
-        <Header variant="h1">Postman Collection Generator</Header>
+        <Header variant="h1">AWS API Collections Factory</Header>
         <section className="direct-open__message">
           <Header variant="h2">Open the local server URL</Header>
           <SpaceBetween size="s">
@@ -772,7 +772,7 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
   return (
     <>
       <TopNavigation
-        identity={{ href: '/', title: 'Postman Collection Generator' }}
+        identity={{ href: '/', title: 'AWS API Collections Factory' }}
         utilities={[
           ...(authenticationEnabled && onSignOut ? [{
             type: 'button' as const,

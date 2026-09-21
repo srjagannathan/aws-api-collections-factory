@@ -198,7 +198,7 @@ export async function startLocalServer(argv = process.argv.slice(2)): Promise<vo
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => resolvePromise());
   });
-  console.log(`Postman Collection Generator: http://127.0.0.1:${port}`);
+  console.log(`AWS API Collections Factory: http://127.0.0.1:${port}`);
   console.log('Bound to localhost only. Press Ctrl-C to stop.');
 }
 

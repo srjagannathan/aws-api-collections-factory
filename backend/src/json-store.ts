@@ -18,7 +18,7 @@ export async function readJson<T>(path: string, fallback: T): Promise<T> {
 export async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   const directory = dirname(path);
   await mkdir(directory, { recursive: true });
-  const temporary = join(directory, `.postman-collection-generator-${randomUUID()}.tmp`);
+  const temporary = join(directory, `.aws-api-collections-factory-${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
     await rename(temporary, path);
