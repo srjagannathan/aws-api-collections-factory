@@ -315,6 +315,28 @@ Each collection includes AWS Signature Version 4 authentication and these variab
 
 Keep real AWS credentials in a private Postman environment or another approved secret store.
 
+## Postman Environment
+
+`config/postman-environment.example.json` is a neutral Postman Environment template matching the
+variables above. It contains no credentials and is safe to commit. Import it into Postman
+(Environments -> Import), select it while calling a generated collection, and fill in real values
+for at least:
+
+| Variable | Purpose |
+|---|---|
+| `aws_region` | Region to call; defaults to `us-east-1` |
+| `aws_access_key_id` | AWS access key ID (marked `secret`, masked in the Postman UI) |
+| `aws_secret_access_key` | AWS secret access key (marked `secret`) |
+| `aws_session_token` | Session token for temporary credentials (marked `secret`; leave empty for long-term keys) |
+
+An environment variable takes precedence over a collection variable of the same name whenever it
+is enabled, regardless of value. `aws_service` and `baseUrl` are therefore included but disabled by
+default so each collection's generated per-service defaults keep working; enable one only to
+override it, for example to point `baseUrl` at a VPC endpoint.
+
+Export your filled-in copy back to `*.postman_environment.json` (or any name ending that way) so
+`.gitignore` keeps it out of version control, since it will contain live credentials.
+
 ## Test and Verify
 
 ```bash
