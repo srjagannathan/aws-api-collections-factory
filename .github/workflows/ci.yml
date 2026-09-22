@@ -75,3 +75,6 @@ jobs:
 
       - name: Audit AWS deployment dependencies
         run: npm audit --prefix deploy/aws --audit-level=high
+
+      - name: Remediate package vulnerability
+        run: npm audit fix
