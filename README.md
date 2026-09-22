@@ -32,6 +32,20 @@ Python and containers are not required.
 
 ## Install
 
+Each component installs and builds independently. A working local `refresh` pipeline needs the
+Java converter, the `scripts/` converter, and the backend at minimum; the webapp and the AWS
+deployment are optional and independently deployable.
+
+| Component | Install | Build | Independently deployable |
+|---|---|---|---|
+| Java Smithy converter (root) | — | `./gradlew installDist` | No — the backend calls the installed binary for `restJson1`/`restXml` conversion |
+| `scripts/` OpenAPI to Postman converter | `npm ci --prefix scripts` | — (no build step) | No — invoked by the backend; runnable standalone via `node scripts/openapi-to-postman.js` |
+| `backend/` core, CLI, local server | `npm ci --prefix backend` | `npm run build --prefix backend` | No — requires the Java converter and `scripts/` at runtime |
+| `webapp/` React application | `npm ci --prefix webapp` | `npm run build --prefix webapp` | Yes — builds to ignored `webui/static/`; ships to S3/CloudFront in the AWS deployment |
+| `deploy/aws/` AWS CDK stack | `npm ci --prefix deploy/aws` | `npm run build --prefix deploy/aws` | Yes — deploys the complete hosted application; see [AWS Deployment](#aws-deployment) |
+
+### Fresh install (all components)
+
 ```bash
 npm ci --prefix backend
 npm ci --prefix scripts
@@ -57,6 +71,29 @@ The application uses the operating system's standard application-data directory:
 
 Set `APISYNC_HOME` to use another directory. Configuration examples under `config/` contain no
 workspace identifier, credential, account identifier, personal path, or required fork.
+
+### Installing one component
+
+Run only the install/build commands from the table above for the component you need. For example,
+to work on the browser application alone:
+
+```bash
+npm ci --prefix webapp
+npm run build --prefix webapp
+```
+
+The webapp still needs a running backend (local server or a deployed API Gateway) to exercise the
+service catalog and publishing flows. Use `npm run dev --prefix webapp` for a standalone Vite dev
+server when only iterating on the UI.
+
+### Starting over
+
+```bash
+npm run clean           # build output: build/, .gradle/, bin/, dist/, webui/static/, output/, reports/, coverage/
+npm run clean:modules   # every component's node_modules/
+```
+
+Repeat the fresh-install steps above after either command.
 
 ## AWS Models
 
