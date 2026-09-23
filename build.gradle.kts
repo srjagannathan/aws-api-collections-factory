@@ -19,6 +19,9 @@ dependencies {
     // Smithy core and OpenAPI conversion
     implementation("software.amazon.smithy:smithy-model:1.72.1")
     implementation("software.amazon.smithy:smithy-openapi:1.72.1")
+    // smithy-openapi pulls this in transitively, but com.awspostman.openapi.* and the restXml
+    // OpenApiProtocol below import its classes (Schema, JsonSchemaMapper) directly.
+    implementation("software.amazon.smithy:smithy-jsonschema:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-traits:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-iam-traits:1.72.1")
     implementation("software.amazon.smithy:smithy-aws-cloudformation-traits:1.72.1")
