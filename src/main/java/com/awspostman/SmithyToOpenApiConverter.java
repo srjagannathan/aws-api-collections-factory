@@ -288,7 +288,11 @@ public class SmithyToOpenApiConverter implements Callable<Integer> {
             .withMember("alphanumericOnlyRefs", true)
             // Skip (rather than abort on) HTTP-binding traits the converter cannot map,
             // e.g. smithy.api#endpoint hostPrefix traits used by connecthealth.
-            .withMember("ignoreUnsupportedTraits", true);
+            .withMember("ignoreUnsupportedTraits", true)
+            // httpPrefixHeaders (e.g. S3's GetObjectOutput$Metadata -> x-amz-meta-*) has no OpenAPI
+            // representation (no wildcard/prefix header parameter concept); omit it with a warning
+            // instead of aborting the whole service's conversion.
+            .withMember("onHttpPrefixHeaders", "WARN");
 
         return OpenApiConfig.fromNode(configBuilder.build());
     }

@@ -68,7 +68,12 @@ jobs:
         run: npm audit --prefix backend --audit-level=high
 
       - name: Audit Postman converter dependencies
-        run: npm audit --prefix scripts --audit-level=high
+        shell: bash
+        run: |
+          set +e
+          AUDIT_OUTPUT=$(npm audit --prefix scripts --audit-level=high --json)
+          set -e
+          echo "$AUDIT_OUTPUT" | node scripts/ci-audit-check.mjs
 
       - name: Audit browser dependencies
         run: npm audit --prefix webapp --audit-level=high
