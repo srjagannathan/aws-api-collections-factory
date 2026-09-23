@@ -6,8 +6,6 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import {
-  collectionHash,
-  countRequests,
   filterCorsOperations,
   normalizeCollectionName,
   specificationOperationIds,
@@ -25,11 +23,11 @@ import {
   sourceRef,
   syncModelsRepository,
 } from './model-source.js';
+import { knownOutputIds, resolveEnabledConverters } from './outputs/registry.js';
+import type { ComposedConverter, OutputConverter, Scenario } from './outputs/types.js';
 import {
   PostmanClient,
-  PostmanApiError,
   postmanApiKey,
-  pushCollection,
   uidIdPortion,
 } from './postman-client.js';
 import { runProcess } from './process.js';
@@ -54,6 +52,11 @@ export interface RefreshOptions {
   discardLocal?: boolean;
   createMissing?: boolean;
   keepStaging?: boolean;
+  // For composed outputs (e.g. interaction-poc) whose scenarios reference
+  // services outside this run's targets: 'current' (default) converts those
+  // services fresh in this run too; 'last-used' reuses whatever spec was
+  // persisted from the last successful non-dry-run refresh instead.
+  scenarioSpecs?: 'current' | 'last-used';
 }
 
 export interface PipelineOutcome {
@@ -68,6 +71,7 @@ export async function initializeApplicationState(paths: RuntimePaths): Promise<J
   for (const [exampleName, destination] of [
     ['services.example.json', paths.servicesConfig],
     ['postman.example.json', paths.postmanConfig],
+    ['outputs.example.json', paths.outputsConfig],
   ] as const) {
     try {
       await access(destination, constants.F_OK);
@@ -106,8 +110,8 @@ export async function loadTrackedServices(paths: RuntimePaths): Promise<string[]
 
 export async function checkPipeline(context: PipelineContext): Promise<JsonMap> {
   const { repository, paths, logger } = context;
-  const modelsRepository = await resolveModelsRepository(repository, paths, logger);
   const tracked = new Set(await loadTrackedServices(paths));
+  const modelsRepository = await resolveModelsRepository(repository, paths, logger);
   const source = sourceRef(repository);
   await fetchSource(modelsRepository, repository, logger, false);
 
@@ -156,12 +160,51 @@ export async function checkPipeline(context: PipelineContext): Promise<JsonMap> 
   };
 }
 
-async function assertRefreshPrerequisites(
+// Checks that don't need the AWS models repository, so callers can run them
+// before paying for a clone (the repository may not exist locally yet).
+async function assertRefreshEnvironment(
   context: PipelineContext,
+  options: RefreshOptions,
+): Promise<{ apiKey: string | undefined; outputConverter: OutputConverter; composedConverters: ComposedConverter[] }> {
+  const { paths } = context;
+  try {
+    await access(paths.javaLauncher, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
+  } catch {
+    throw new ApplicationError(
+      `The Java converter is missing: ${paths.javaLauncher}\nRun ./gradlew installDist.`,
+    );
+  }
+  try {
+    await access(join(paths.postmanConverterDirectory, 'node_modules'), constants.F_OK);
+  } catch {
+    throw new ApplicationError('Postman converter dependencies are missing. Run npm install in scripts/.');
+  }
+  const { perService, composed, unknownIds } = await resolveEnabledConverters(paths);
+  if (unknownIds.length > 0) {
+    throw new ApplicationError(
+      `Unknown output converter(s) in ${paths.outputsConfig}: ${unknownIds.join(', ')}. `
+      + `Known: ${knownOutputIds().join(', ')}.`,
+    );
+  }
+  if (perService.length !== 1) {
+    // Only one per-service output type (Postman) is implemented so far, so
+    // exactly one must resolve. This becomes a real choice once a second
+    // per-service type exists; composed outputs (e.g. interaction-poc) are
+    // separate and may be zero or more regardless of this constraint.
+    throw new ApplicationError(
+      `Exactly one per-service output converter must be enabled in ${paths.outputsConfig}. `
+      + `Enabled: ${perService.length ? perService.map((converter) => converter.id).join(', ') : '(none)'}.`,
+    );
+  }
+  const apiKey = options.dryRun ? undefined : postmanApiKey();
+  return { apiKey, outputConverter: perService[0]!, composedConverters: composed };
+}
+
+async function assertRepositoryClean(
   modelsRepository: string,
   options: RefreshOptions,
-): Promise<string | undefined> {
-  const { paths, logger } = context;
+  logger: Logger,
+): Promise<void> {
   const probe = await git(modelsRepository, ['rev-parse', '--is-inside-work-tree'], { check: false });
   if (probe.exitCode !== 0 || probe.stdout.trim() !== 'true') {
     throw new ApplicationError(`The models repository is not a Git worktree: ${modelsRepository}`);
@@ -176,19 +219,6 @@ async function assertRefreshPrerequisites(
     await git(modelsRepository, ['checkout', '--', 'models/']);
     logger.warn('Discarded local changes under models/.');
   }
-  try {
-    await access(paths.javaLauncher, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
-  } catch {
-    throw new ApplicationError(
-      `The Java converter is missing: ${paths.javaLauncher}\nRun ./gradlew installDist.`,
-    );
-  }
-  try {
-    await access(join(paths.postmanConverterDirectory, 'node_modules'), constants.F_OK);
-  } catch {
-    throw new ApplicationError('Postman converter dependencies are missing. Run npm install in scripts/.');
-  }
-  return options.dryRun ? undefined : postmanApiKey();
 }
 
 async function resolveTargets(
@@ -267,22 +297,6 @@ async function runConversionLanes(
   return { lanes, failures };
 }
 
-async function runPostmanConversion(
-  context: PipelineContext,
-  stagingOpenApi: string,
-  stagingPostman: string,
-): Promise<void> {
-  const result = await runProcess('node', [
-    context.paths.postmanConverter,
-    'convert',
-    stagingOpenApi,
-    '-o', stagingPostman,
-  ], { cwd: context.paths.postmanConverterDirectory, logger: context.logger });
-  if (result.exitCode !== 0) {
-    context.logger.warn(`The Postman conversion stage exited with status ${result.exitCode}.`);
-  }
-}
-
 async function writeReport(paths: RuntimePaths, report: JsonMap, dryRun: boolean): Promise<string> {
   const suffix = dryRun ? '-dryrun' : '';
   const path = join(paths.reports, `refresh-${nowStamp()}${suffix}.json`);
@@ -295,11 +309,12 @@ export async function refreshPipeline(
   options: RefreshOptions,
 ): Promise<PipelineOutcome> {
   const { repository, paths, logger } = context;
+  const tracked = await loadTrackedServices(paths);
+  const { apiKey, outputConverter, composedConverters } = await assertRefreshEnvironment(context, options);
   const modelsRepository = await resolveModelsRepository(repository, paths, logger);
   const modelsRoot = join(modelsRepository, 'models');
-  const tracked = await loadTrackedServices(paths);
   const source = sourceRef(repository);
-  const apiKey = await assertRefreshPrerequisites(context, modelsRepository, options);
+  await assertRepositoryClean(modelsRepository, options, logger);
   await fetchSource(modelsRepository, repository, logger, true);
 
   const syncStatePath = join(paths.applicationHome, 'sync-state.json');
@@ -317,6 +332,21 @@ export async function refreshPipeline(
     source,
     options,
   );
+
+  const scenariosByConverter = new Map<string, Scenario[]>();
+  for (const converter of composedConverters) {
+    scenariosByConverter.set(converter.id, await converter.loadScenarios(paths));
+  }
+  const scenarioSpecsMode = options.scenarioSpecs || 'current';
+  const scenarioRequiredServices = new Set<string>();
+  for (const converter of composedConverters) {
+    for (const service of converter.requiredServices(scenariosByConverter.get(converter.id)!)) {
+      scenarioRequiredServices.add(service);
+    }
+  }
+  const stagingTargets = scenarioSpecsMode === 'current'
+    ? [...new Set([...targets, ...scenarioRequiredServices])].sort()
+    : targets;
 
   let mirrorPushed: boolean | null = null;
   if (options.dryRun) {
@@ -340,8 +370,9 @@ export async function refreshPipeline(
     mirror_pushed: mirrorPushed,
     targets,
     services: {},
+    scenarios: {},
   };
-  if (targets.length === 0) {
+  if (stagingTargets.length === 0 && composedConverters.length === 0) {
     const reportPath = await writeReport(paths, report, Boolean(options.dryRun));
     return { report, reportPath, exitCode: 0 };
   }
@@ -360,9 +391,16 @@ export async function refreshPipeline(
   const results: JsonMap = {};
   const stagedOperations = new Map<string, string[]>();
   const collections = new Map<string, JsonMap>();
+  const targetSet = new Set(targets);
   try {
-    const conversion = await runConversionLanes(context, modelsRoot, targets, stagingOpenApi);
+    // stagingTargets may be a superset of targets: an enabled composed
+    // output (e.g. interaction-poc) can pull in services its scenarios
+    // reference that this run otherwise wouldn't have touched. Those extra
+    // services get their spec staged below but are deliberately excluded
+    // from the per-service report/Postman-push path via targetSet.
+    const conversion = await runConversionLanes(context, modelsRoot, stagingTargets, stagingOpenApi);
     for (const [service, error] of conversion.failures) {
+      if (!targetSet.has(service)) continue;
       results[service] = {
         lane: conversion.lanes.get(service) || null,
         requests: null,
@@ -375,7 +413,7 @@ export async function refreshPipeline(
     }
 
     for (const [service, lane] of [...conversion.lanes.entries()].sort()) {
-      if (results[service]) {
+      if (!targetSet.has(service) || results[service]) {
         continue;
       }
       const specPath = join(stagingOpenApi, `${service}.openapi.json`);
@@ -409,19 +447,18 @@ export async function refreshPipeline(
     }
 
     if (stagedOperations.size > 0) {
-      await runPostmanConversion(context, stagingOpenApi, stagingPostman);
+      await outputConverter.convertAll(paths, logger, stagingOpenApi, stagingPostman);
     }
     for (const service of [...stagedOperations.keys()].sort()) {
-      const collectionPath = join(stagingPostman, `${service}.postman_collection.json`);
       const entry = results[service];
       try {
-        const collection = JSON.parse(await readFile(collectionPath, 'utf8')) as JsonMap;
-        collections.set(service, collection);
-        entry.requests = countRequests(collection.item);
-        entry.hash = collectionHash(collection);
+        const artifact = await outputConverter.readArtifact(stagingPostman, service);
+        collections.set(service, artifact.data);
+        entry.requests = artifact.metric;
+        entry.hash = artifact.hash;
       } catch (error) {
         entry.status = 'failed-collection';
-        entry.error = `No valid ${basename(collectionPath)} was produced: ${String(error)}`;
+        entry.error = error instanceof Error ? error.message : String(error);
       }
     }
 
@@ -439,9 +476,8 @@ export async function refreshPipeline(
     }
 
     if (toPush.length > 0 && !options.dryRun) {
-      const client = new PostmanClient(apiKey!);
       try {
-        await client.request('GET', '/me');
+        await outputConverter.preflight!(apiKey!);
       } catch (error) {
         for (const service of toPush.splice(0)) {
           results[service].status = 'failed-push';
@@ -451,11 +487,11 @@ export async function refreshPipeline(
       for (const service of toPush) {
         const entry = results[service];
         const mapping = postmanMap[service];
-        const pushed = await pushCollection(
-          client,
-          collections.get(service)!,
+        const pushed = await outputConverter.push!(
+          apiKey!,
+          { data: collections.get(service)!, hash: entry.hash as string, metric: entry.requests as number },
           mapping,
-          postmanConfig.workspace_id,
+          postmanConfig,
           Boolean(options.createMissing || mapping?.missing),
         );
         entry.status = pushed.status;
@@ -506,9 +542,53 @@ export async function refreshPipeline(
       await writeJsonAtomic(syncStatePath, syncState);
     }
 
+    const scenarios: JsonMap = {};
+    for (const converter of composedConverters) {
+      const converterScenarios = scenariosByConverter.get(converter.id)!;
+      if (converterScenarios.length === 0) continue;
+
+      const specPaths = new Map<string, string>();
+      for (const service of converter.requiredServices(converterScenarios)) {
+        if (conversion.lanes.has(service)) {
+          specPaths.set(service, join(stagingOpenApi, `${service}.openapi.json`));
+        } else if (scenarioSpecsMode === 'last-used') {
+          const lastUsedPath = join(paths.outputOpenApi, `${service}.openapi.json`);
+          try {
+            await access(lastUsedPath, constants.F_OK);
+            specPaths.set(service, lastUsedPath);
+          } catch {
+            // No persisted spec either; reported per-scenario below.
+          }
+        }
+      }
+
+      const converterStaging = join(staging, converter.id);
+      const scenarioResults = await converter.convertAll(converterScenarios, specPaths, converterStaging);
+      const persistDir = join(paths.outputRoot, converter.id);
+      if (!options.dryRun) {
+        await mkdir(persistDir, { recursive: true });
+      }
+      for (const [scenarioId, result] of scenarioResults) {
+        if (result.status === 'generated' && result.artifactPath && !options.dryRun) {
+          const persistedPath = join(persistDir, basename(result.artifactPath));
+          await copyFile(result.artifactPath, persistedPath);
+          scenarios[scenarioId] = { output: converter.id, status: 'generated', artifact_path: persistedPath, error: null };
+        } else {
+          scenarios[scenarioId] = {
+            output: converter.id,
+            status: options.dryRun && result.status === 'generated' ? 'dry-run' : result.status,
+            artifact_path: null,
+            error: result.error || null,
+          };
+        }
+      }
+    }
+
     report.services = results;
+    report.scenarios = scenarios;
     const reportPath = await writeReport(paths, report, Boolean(options.dryRun));
-    const failed = Object.values(results).some((entry: any) => String(entry.status || '').startsWith('failed'));
+    const failed = Object.values(results).some((entry: any) => String(entry.status || '').startsWith('failed'))
+      || Object.values(scenarios).some((entry: any) => entry.status === 'failed');
     return { report, reportPath, exitCode: failed ? 1 : 0 };
   } finally {
     if (options.keepStaging) {

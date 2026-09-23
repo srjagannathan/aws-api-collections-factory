@@ -39,9 +39,5 @@ backend/config/postman.json
 backend/config/service-catalog.json
 backend/config/services.json
 backend/config/sync-state.json
-backend/config/reports/refresh-20260915-161205.json
-backend/config/reports/refresh-20260915-161222.json
-backend/config/reports/refresh-20260915-161534.json
-backend/config/reports/refresh-20260915-162158-dryrun.json
-backend/config/reports/refresh-20260915-162305.json
+backend/config/reports/*.json
 scripts/package-lock.json

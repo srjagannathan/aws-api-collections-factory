@@ -56,6 +56,8 @@ export function runtimePaths(
     applicationHome,
     servicesConfig: join(applicationHome, 'services.json'),
     postmanConfig: join(applicationHome, 'postman.json'),
+    outputsConfig: join(applicationHome, 'outputs.json'),
+    outputRoot: join(applicationHome, 'output'),
     outputOpenApi: join(applicationHome, 'output', 'openapi'),
     outputPostman: join(applicationHome, 'output', 'postman'),
     reports: join(applicationHome, 'reports'),

@@ -1,0 +1,22 @@
+{
+  "id": "s3-lambda-sns",
+  "title": "Upload triggers processing and notification",
+  "description": "A file lands in S3, a Lambda function processes it, and SNS notifies subscribers that the work is done.",
+  "steps": [
+    {
+      "service": "s3",
+      "operation": "PutObject",
+      "narrative": "A client uploads a file to a bucket. This is the event that starts the workflow."
+    },
+    {
+      "service": "lambda",
+      "operation": "Invoke",
+      "narrative": "An S3 event notification (configured separately) triggers a Lambda function to process the uploaded object."
+    },
+    {
+      "service": "sns",
+      "operation": "Publish",
+      "narrative": "Once processing finishes, the function publishes a completion message so subscribed systems and people find out."
+    }
+  ]
+}

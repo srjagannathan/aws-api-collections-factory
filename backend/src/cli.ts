@@ -53,6 +53,9 @@ Refresh options:
   --discard-local         Delete local changes under models/
   --create-missing        Create unmapped Postman collections
   --keep-staging          Preserve temporary conversion files
+  --scenario-specs MODE   current (default) or last-used: how composed
+                          outputs (e.g. interaction-poc) source specs for
+                          services outside this run's targets
   --json                  Emit machine-readable JSON
 `;
 
@@ -142,6 +145,18 @@ function renderRefresh(outcome: { report: JsonMap; reportPath: string }): void {
   } else {
     printTable(['service', 'lane', 'requests', 'ops +/-', 'status'], rows);
   }
+  const scenarios = outcome.report.scenarios || {};
+  const scenarioIds = Object.keys(scenarios).sort();
+  if (scenarioIds.length > 0) {
+    console.log('');
+    printTable(
+      ['scenario', 'output', 'status'],
+      scenarioIds.map((id) => {
+        const entry = scenarios[id];
+        return [id, entry.output, `${entry.status}${entry.error ? ` (${entry.error})` : ''}`];
+      }),
+    );
+  }
   console.log(`Report: ${outcome.reportPath}`);
 }
 
@@ -179,6 +194,7 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
       'discard-local': { type: 'boolean' },
       'create-missing': { type: 'boolean' },
       'keep-staging': { type: 'boolean' },
+      'scenario-specs': { type: 'string' },
       workspace: { type: 'string' },
       yes: { type: 'boolean' },
     },
@@ -237,6 +253,10 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
     if (parsed.values.all && selected?.length) {
       throw new ApplicationError('--all and --service cannot be used together.');
     }
+    const scenarioSpecs = parsed.values['scenario-specs'];
+    if (scenarioSpecs !== undefined && scenarioSpecs !== 'current' && scenarioSpecs !== 'last-used') {
+      throw new ApplicationError("--scenario-specs must be 'current' or 'last-used'.");
+    }
     const outcome = await refreshPipeline(context, {
       all: Boolean(parsed.values.all),
       services: selected,
@@ -245,6 +265,7 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
       discardLocal: Boolean(parsed.values['discard-local']),
       createMissing: Boolean(parsed.values['create-missing']),
       keepStaging: Boolean(parsed.values['keep-staging']),
+      scenarioSpecs,
     });
     if (parsed.values.json) console.log(JSON.stringify(outcome.report, null, 2));
     else renderRefresh(outcome);

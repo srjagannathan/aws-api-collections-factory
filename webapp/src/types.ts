@@ -47,6 +47,37 @@ export interface CheckResult extends Record<string, unknown> {
   untracked_changed: number;
 }
 
+export type RefreshServiceStatus =
+  | 'updated'
+  | 'created'
+  | 'skipped-unchanged'
+  | 'dry-run'
+  | 'failed-route'
+  | 'failed-convert'
+  | 'failed-collection'
+  | 'failed-push'
+  | 'failed-unmapped';
+
+export interface RefreshServiceResult {
+  lane: 'java' | 'typescript' | null;
+  requests: number | null;
+  ops_added: string[];
+  ops_removed: string[];
+  hash: string | null;
+  status: RefreshServiceStatus | null;
+  error: string | null;
+}
+
+export interface RefreshReport extends Record<string, unknown> {
+  command: string;
+  dry_run: boolean;
+  source_ref: string;
+  mirror_remote: string | null;
+  mirror_pushed: boolean | null;
+  targets: string[];
+  services: Record<string, RefreshServiceResult>;
+}
+
 export interface Job {
   id: string;
   kind: JobKind;

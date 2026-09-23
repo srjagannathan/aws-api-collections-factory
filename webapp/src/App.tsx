@@ -37,6 +37,9 @@ import type {
   CollectionStatus,
   Job,
   JobKind,
+  RefreshReport,
+  RefreshServiceResult,
+  RefreshServiceStatus,
 } from './types';
 
 type ScopeFilter = 'all' | 'tracked' | 'untracked' | 'unmapped';
@@ -106,6 +109,32 @@ function isCheckResult(value: Record<string, unknown> | null): value is CheckRes
     && Array.isArray(value.changed_tracked)
     && value.changed_tracked.every(isCheckServiceChange)
     && typeof value.untracked_changed === 'number';
+}
+
+function isRefreshReport(value: Record<string, unknown> | null): value is RefreshReport {
+  if (!value) return false;
+  return typeof value.command === 'string'
+    && typeof value.dry_run === 'boolean'
+    && Array.isArray(value.targets)
+    && typeof value.services === 'object'
+    && value.services !== null;
+}
+
+const REFRESH_SUCCESS_STATUSES = new Set<RefreshServiceStatus>(['updated', 'created', 'skipped-unchanged', 'dry-run']);
+
+function refreshServiceStatusIndicator(status: RefreshServiceStatus | null) {
+  switch (status) {
+    case 'updated': return <StatusIndicator type="success">Updated</StatusIndicator>;
+    case 'created': return <StatusIndicator type="success">Created</StatusIndicator>;
+    case 'skipped-unchanged': return <StatusIndicator type="info">Unchanged</StatusIndicator>;
+    case 'dry-run': return <StatusIndicator type="pending">Would update</StatusIndicator>;
+    case 'failed-route': return <StatusIndicator type="error">Not found in model source</StatusIndicator>;
+    case 'failed-convert': return <StatusIndicator type="error">Conversion failed</StatusIndicator>;
+    case 'failed-collection': return <StatusIndicator type="error">Collection build failed</StatusIndicator>;
+    case 'failed-push': return <StatusIndicator type="error">Publish failed</StatusIndicator>;
+    case 'failed-unmapped': return <StatusIndicator type="error">Needs creation</StatusIndicator>;
+    default: return <StatusIndicator type="pending">Pending</StatusIndicator>;
+  }
 }
 
 interface CategoryNavigationProps {
@@ -430,10 +459,20 @@ function ModelUpdatePanel({ job, services }: ModelUpdatePanelProps) {
   );
 }
 
-function PipelineJobPanel({ job }: { job: Job }) {
+function PipelineJobPanel({ job, services }: { job: Job; services: CategorizedService[] }) {
+  const serviceNames = useMemo(
+    () => new Map(services.map((service) => [service.id, service.name])),
+    [services],
+  );
   const statusType = job.status === 'running' ? 'in-progress' : job.status === 'succeeded' ? 'success' : 'error';
   const statusText = job.status === 'running' ? 'Running' : job.status === 'succeeded' ? 'Complete' : 'Failed';
   const title = job.kind === 'preview' ? 'Collection preview' : 'Collection publish';
+  const result = isRefreshReport(job.result) ? job.result : null;
+  const entries = result
+    ? Object.entries(result.services).sort(([left], [right]) => left.localeCompare(right))
+    : [];
+  const succeededCount = entries.filter(([, entry]) => REFRESH_SUCCESS_STATUSES.has(entry.status as RefreshServiceStatus)).length;
+  const failedCount = entries.length - succeededCount;
 
   return (
     <section className={`pipeline-job-panel is-${job.status}`} aria-live="polite">
@@ -448,8 +487,91 @@ function PipelineJobPanel({ job }: { job: Job }) {
         <StatusIndicator type={statusType}>{statusText}</StatusIndicator>
       </div>
       {job.status === 'running' && <div className="model-update-activity" aria-hidden="true"><span /></div>}
+
+      {job.kind === 'preview' && job.status === 'succeeded' && (
+        <div className="model-update-panel__sync-note">
+          This was a preview. No Postman collections were changed.
+        </div>
+      )}
+
+      {entries.length > 0 && (
+        <>
+          <div className="model-update-summary">
+            <div className="model-update-stat">
+              <span className="model-update-stat__value">{entries.length}</span>
+              <span className="model-update-stat__label">Services processed</span>
+            </div>
+            <div className="model-update-stat">
+              <span className="model-update-stat__value">{succeededCount}</span>
+              <span className="model-update-stat__label">{job.kind === 'preview' ? 'Would succeed' : 'Succeeded'}</span>
+            </div>
+            <div className="model-update-stat">
+              <span className="model-update-stat__value">{failedCount}</span>
+              <span className="model-update-stat__label">Failed</span>
+            </div>
+          </div>
+
+          <ExpandableSection defaultExpanded headerText={`Service results (${entries.length})`}>
+            <div className="model-change-table-wrap">
+              <table className="model-change-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Service</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Requests</th>
+                    <th scope="col">Operation changes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map(([serviceId, entry]) => (
+                    <tr key={serviceId}>
+                      <th scope="row">
+                        <span>{serviceNames.get(serviceId) || serviceId}</span>
+                        <code>{serviceId}</code>
+                      </th>
+                      <td>
+                        {refreshServiceStatusIndicator(entry.status)}
+                        {entry.error && <div className="model-change-table__metadata">{entry.error}</div>}
+                      </td>
+                      <td>{entry.requests ?? '—'}</td>
+                      <td>
+                        {entry.ops_added.length === 0 && entry.ops_removed.length === 0 ? (
+                          <span className="model-change-table__metadata">No operation changes</span>
+                        ) : (
+                          <div className="operation-changes">
+                            {entry.ops_added.length > 0 && (
+                              <div className="operation-change">
+                                <span className="operation-label is-added">Added</span>
+                                <span className="operation-list">
+                                  {entry.ops_added.map((operation) => <code key={operation}>{operation}</code>)}
+                                </span>
+                              </div>
+                            )}
+                            {entry.ops_removed.length > 0 && (
+                              <div className="operation-change">
+                                <span className="operation-label is-removed">Removed</span>
+                                <span className="operation-list">
+                                  {entry.ops_removed.map((operation) => <code key={operation}>{operation}</code>)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ExpandableSection>
+        </>
+      )}
+
       {(job.output || job.status === 'running') && (
-        <ExpandableSection headerText="Pipeline log" defaultExpanded={job.status === 'failed'}>
+        <ExpandableSection
+          headerText="Raw pipeline log"
+          defaultExpanded={job.status === 'failed' && entries.length === 0}
+        >
           <pre className="job-output">{job.output || 'Waiting for pipeline output...'}</pre>
         </ExpandableSection>
       )}
@@ -629,6 +751,35 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
   );
 
   const jobRunning = currentJob?.status === 'running' || latestCheck?.status === 'running';
+  const selectedTrackedCount = selectedServices.filter((service) => service.tracked).length;
+  const selectedUntrackedCount = selectedServices.length - selectedTrackedCount;
+  const jobRunningReason = 'Wait for the current job to finish.';
+  const trackDisabledReason = jobRunning
+    ? jobRunningReason
+    : selectedIds.size === 0
+      ? 'Select at least one untracked service first.'
+      : selectedUntrackedCount === 0
+        ? 'All selected services are already tracked.'
+        : undefined;
+  const untrackDisabledReason = jobRunning
+    ? jobRunningReason
+    : selectedIds.size === 0
+      ? 'Select at least one tracked service first.'
+      : selectedTrackedCount === 0
+        ? 'None of the selected services are tracked.'
+        : undefined;
+  const clearSelectionDisabledReason = jobRunning
+    ? jobRunningReason
+    : selectedIds.size === 0
+      ? 'No services are selected.'
+      : undefined;
+  const pipelineDisabledReason = jobRunning
+    ? jobRunningReason
+    : selectedIds.size === 0
+      ? 'Select at least one service first.'
+      : selectedUntrackedCount > 0
+        ? 'Track the selected services before running the pipeline.'
+        : undefined;
   const trackedCount = services.filter((service) => service.tracked).length;
   const mappedCount = services.filter(
     (service) => service.tracked && service.collection_status === 'mapped',
@@ -881,7 +1032,7 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
 
               <ModelUpdatePanel job={latestCheck} services={services} />
 
-              {currentJob && currentJob.kind !== 'check' && <PipelineJobPanel job={currentJob} />}
+              {currentJob && currentJob.kind !== 'check' && <PipelineJobPanel job={currentJob} services={services} />}
 
               <Table
                 variant="full-page"
@@ -949,13 +1100,15 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
                     actions={(
                       <div className="service-actions">
                         <Button
-                          disabled={selectedIds.size === 0 || jobRunning}
+                          disabled={Boolean(trackDisabledReason)}
+                          disabledReason={trackDisabledReason}
                           onClick={() => void updateTracking(true)}
                         >
                           Track
                         </Button>
                         <Button
-                          disabled={selectedIds.size === 0 || jobRunning}
+                          disabled={Boolean(untrackDisabledReason)}
+                          disabledReason={untrackDisabledReason}
                           onClick={() => void updateTracking(false)}
                         >
                           Untrack
@@ -963,12 +1116,14 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
                         <Button
                           iconName="close"
                           ariaLabel="Clear service selection"
-                          disabled={selectedIds.size === 0 || jobRunning}
+                          disabled={Boolean(clearSelectionDisabledReason)}
+                          disabledReason={clearSelectionDisabledReason}
                           onClick={() => setSelectedIds(new Set())}
                         />
                         <Button
                           iconName="view-full"
-                          disabled={selectedIds.size === 0 || jobRunning}
+                          disabled={Boolean(pipelineDisabledReason)}
+                          disabledReason={pipelineDisabledReason}
                           onClick={() => void startJob('preview')}
                         >
                           Preview
@@ -976,7 +1131,8 @@ function App({ authenticationEnabled = false, onSignOut }: AppProps) {
                         <Button
                           variant="primary"
                           iconName="upload"
-                          disabled={selectedIds.size === 0 || jobRunning}
+                          disabled={Boolean(pipelineDisabledReason)}
+                          disabledReason={pipelineDisabledReason}
                           onClick={() => setPublishModalVisible(true)}
                         >
                           Publish

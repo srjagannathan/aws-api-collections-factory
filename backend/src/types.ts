@@ -35,6 +35,8 @@ export interface RuntimePaths {
   applicationHome: string;
   servicesConfig: string;
   postmanConfig: string;
+  outputsConfig: string;
+  outputRoot: string;
   outputOpenApi: string;
   outputPostman: string;
   reports: string;
